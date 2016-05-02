@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>        /* Added for gcc. JJW 01/14/14 */
-#include<sys/time.h>
+#include <string.h>
+#include <stdint.h>
 #include<time.h>
 #include<math.h>
 
@@ -36,7 +37,9 @@ struct pkt {
   int checksum;
   char payload[DATA_LENGTH];
 };
-
+void tolayer5(int AorB, char* datasent);
+void tolayer3(int AorB, struct pkt packet);
+	
 
 /********* STUDENTS WRITE THE NEXT SEVEN ROUTINES *********/
 int A_base, A_nextseq; //base number //expected next sequence number 
@@ -51,18 +54,20 @@ int calc_checksum(struct pkt p){
 	const char * buf = p.payload;
 	int size = DATA_LENGTH;
 	int sum = 0;
+	int i;
 	//Add seqnum to the sum
 	sum = (sum >>1)+((sum & 1) << 15);
 	sum += p.seqnum;
-	sum & = 0xffff;
+	sum &= 0xffff;
 	
 	//Add acknum to the sum
 	sum = (sum >>1)+((sum & 1) << 15);
 	sum += p.acknum;
-	sum & = 0xffff;
+	sum &= 0xffff;
 	
 	//accumulate the payload 
-	for(int i = 0; i < size -1; i+=2){
+	
+	for(i = 0; i < size -1; i+=2){
 		sum = (sum >>1)+((sum & 1) << 15);
 		sum += (int)(buf[i] << WINDOW_SIZE | buf[i +1]);
 		sum &= 0xffff;
@@ -114,8 +119,8 @@ void A_output(struct msg message) {
 
 /* called from layer 3, when a packet arrives for layer 4 */
 void A_input(struct pkt packet) {
-	if(check_checksum(packet) == 1 && packet.acknum <= A_base + WINDOWSIZE){
-		while(pack[0].seqnum <= packet.acknum && pack[0].squnum != 0 && cur_windowsize >0){
+	if(check_checksum(packet) == 1 && packet.acknum <= A_base + WINDOW_SIZE){
+		while(pack[0].seqnum <= packet.acknum && pack[0].seqnum != 0 && cur_windowsize >0){
 			for(int i = 1; i< cur_windowsize; i++){
 				pack[i-1] =pack[i];
 			}
@@ -127,7 +132,7 @@ void A_input(struct pkt packet) {
 		}
 		A_base =packet.acknum + 1;
 		
-		if(A_base = A_nextseq){
+		if(A_base == A_nextseq){
 			if(getTimer((int)'A')){
 				stopTimer((int)'A');
 			}
@@ -147,7 +152,8 @@ void A_timerinterrupt() {
 	//restart timer
 	stopTimer((int)'A');
 	startTimer((int)'A');
-	for(int i = 0; i< WINDOW_SIZE; i++){
+	int i;
+	for(i = 0; i< WINDOW_SIZE; i++){
 		if(pack[i].seqnum != 0){
 			tolayer3((int)'A', pack[i]);
 		}
@@ -172,7 +178,7 @@ void A_init() {
 void B_input(struct pkt packet) {
 	if(check_checksum(packet)){
 		//deliver payload message to B at layer5
-		tolayer5(BEntity, packet.payload);
+		tolayer5((int)'B', packet.payload);
 		
 		struct pkt new_packet;
 		new_packet.seqnum =B_expectseq;
@@ -185,7 +191,7 @@ void B_input(struct pkt packet) {
 	}
 	else{
 		if(B_expectseq > 1){
-			tolayer3((int)'B', B_packet)
+			tolayer3((int)'B', B_packet);
 		}
 	}
 }
@@ -203,7 +209,7 @@ void B_init() {
 	B_expectseq = 1;
 	B_packet.acknum = 0;
 	B_packet.seqnum = 0;
-	B_packet.checknum = calc_checksum(B_packet);
+	B_packet.checksum = calc_checksum(B_packet);
 }
 
 
